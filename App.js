@@ -27,7 +27,7 @@ const App = () => {
                 x2={toNode.x}
                 y2={toNode.y}
                 stroke="black"
-                strokeWidth="2"
+                strokeWidth="1"
               />
             );
           })}
@@ -38,7 +38,7 @@ const App = () => {
               key={index}
               cx={node.x}
               cy={node.y}
-              r="10"
+              r="5"
               fill="blue"
             />
           ))}
