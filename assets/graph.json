@@ -1,0 +1,23 @@
+{
+  "graphs": [
+    {
+      "id": 1,
+      "startNode": 1,
+      "endNode": 4,
+      "nodes": [
+        { "id": 1, "x": 50, "y": 50 },
+        { "id": 2, "x": 150, "y": 150 },
+        { "id": 3, "x": 250, "y": 50 },
+        { "id": 4, "x": 150, "y": 250 }
+      ],
+      "edges": [
+        { "from": 1, "to": 2, "weight": 5 },
+        { "from": 1, "to": 3, "weight": 6 },
+        { "from": 2, "to": 4, "weight": 4 },
+        { "from": 2, "to": 3, "weight": 10 },
+        { "from": 3, "to": 4, "weight": 7 },
+        { "from": 1, "to": 4, "weight": 8 }
+      ]
+    }
+  ]
+}
