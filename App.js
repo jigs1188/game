@@ -1,23 +1,32 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, Alert } from 'react-native';
+import { View, Text, Button, Alert, TextInput, TouchableOpacity } from 'react-native';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 import graphData from './assets/graph.json';
 
 const Graph = () => {
-  const [nodes, setNodes] = useState(graphData.graphs[0].nodes);
-  const [edges, setEdges] = useState(graphData.graphs[0].edges);
-  const [startNode, setStartNode] = useState(graphData.graphs[0].startNode);
-  const [endNode, setEndNode] = useState(graphData.graphs[0].endNode);
+  const [nodes, setNodes] = useState([]);
+  const [edges, setEdges] = useState([]);
+  const [startNode, setStartNode] = useState(null);
+  const [endNode, setEndNode] = useState(null);
   const [totalWeight, setTotalWeight] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [message, setMessage] = useState('');
   const [currentLevel, setCurrentLevel] = useState(0);
   const [selectedEdges, setSelectedEdges] = useState([]);
-  const [lastClickedNode, setLastClickedNode] = useState(startNode);
+  const [lastClickedNode, setLastClickedNode] = useState(null);
   const [optimalPathWeight, setOptimalPathWeight] = useState(null);
   const [reachedDestination, setReachedDestination] = useState(false);
 
-  // Dijkstra's Algorithm to find the shortest path
+  const [minWeight, setMinWeight] = useState('');
+  const [maxWeight, setMaxWeight] = useState('');
+  const [mode, setMode] = useState(''); // '' | 'student' | 'teacher'
+
+  // Load the initial level data when the component mounts
+  useEffect(() => {
+    loadLevel(currentLevel);
+  }, []);
+
+  // Dijkstra algorithm to calculate shortest path
   const dijkstra = (startNode, endNode) => {
     const distances = {};
     const previousNodes = {};
@@ -36,9 +45,7 @@ const Graph = () => {
 
       unvisitedNodes.splice(unvisitedNodes.indexOf(currentNode), 1);
 
-      if (currentNode.id === endNode) {
-        break;
-      }
+      if (currentNode.id === endNode) break;
 
       edges.forEach(edge => {
         if (edge.from === currentNode.id) {
@@ -64,13 +71,41 @@ const Graph = () => {
     return { shortestPath, weight: distances[endNode] };
   };
 
+  const loadLevel = (level) => {
+    if (level < graphData.graphs.length) {
+      const graph = graphData.graphs[level];
+      setNodes(graph.nodes);
+      setEdges(graph.edges);
+      setStartNode(graph.startNode);
+      setEndNode(graph.endNode);
+      setLastClickedNode(graph.startNode); // Reset last clicked node to start node
+      setTotalWeight(0);
+      setSelectedEdges([]);
+      setGameOver(false);
+      setMessage('');
+      setReachedDestination(false);
+
+      // Calculate the optimal path for the new level
+      const { weight } = dijkstra(graph.startNode, graph.endNode);
+      setOptimalPathWeight(weight);
+    } else {
+      setMessage('Congratulations! You completed all levels.');
+    }
+  };
+
   useEffect(() => {
-    const { weight } = dijkstra(startNode, endNode);
-    setOptimalPathWeight(weight);
+    if (startNode && endNode) {
+      const { weight } = dijkstra(startNode, endNode);
+      setOptimalPathWeight(weight);
+    }
   }, [startNode, endNode, nodes, edges]);
 
-  // Handle user clicks on nodes
-  const handleNodeClick = currentNode => {
+  const displayRunningTotal = (additionalWeight) => {
+    setTotalWeight(prevWeight => prevWeight + additionalWeight);
+  };
+  
+
+  const handleNodeClick = (currentNode) => {
     if (gameOver || lastClickedNode === currentNode || reachedDestination) return;
   
     const edge = edges.find(
@@ -82,16 +117,12 @@ const Graph = () => {
     if (edge) {
       const newEdge = { from: lastClickedNode, to: currentNode };
       setSelectedEdges([...selectedEdges, newEdge]);
-  
-      // Reset message when the user continues playing after seeing "Keep going"
-      setMessage('');
+      displayRunningTotal(edge.weight);
   
       if (currentNode === endNode) {
-        setTotalWeight(totalWeight + edge.weight);
         setReachedDestination(true);
         setMessage('You have reached the destination!');
       } else {
-        setTotalWeight(totalWeight + edge.weight);
         setLastClickedNode(currentNode);
       }
     } else {
@@ -99,14 +130,12 @@ const Graph = () => {
     }
   };
   
-  // Check if edge is selected by user
   const isEdgeSelected = (from, to) => {
     return selectedEdges.some(
       edge => (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from)
     );
   };
 
-  // Check if user's path matches the optimal path
   const checkPath = () => {
     if (!reachedDestination) {
       setMessage("Keep going, you haven't reached the destination yet.");
@@ -114,11 +143,8 @@ const Graph = () => {
     }
 
     const { shortestPath } = dijkstra(startNode, endNode);
-
-    // Extract user's selected path as an array of nodes
     const userPath = [startNode, ...selectedEdges.map(edge => edge.to)];
 
-    // Compare the user-selected path with the shortest path
     const isPathCorrect =
       userPath.length === shortestPath.length &&
       userPath.every((node, index) => node === shortestPath[index]);
@@ -132,128 +158,169 @@ const Graph = () => {
     }
   };
 
-  // Reset the game after losing
-  const playAgain = () => {
-    setTotalWeight(0);
+  const playAgainOrNextLevel = () => {
+    if (message === 'Bravo! You found the optimal path!') {
+      setCurrentLevel(currentLevel + 1);
+      loadLevel(currentLevel + 1);
+    } else {
+      loadLevel(currentLevel);
+    }
+  };
+
+  const generateRandomEdges = () => {
+    const newEdges = edges.map(edge => ({
+      ...edge,
+      weight: Math.floor(Math.random() * (parseInt(maxWeight) - parseInt(minWeight) + 1)) + parseInt(minWeight),
+    }));
+    setEdges(newEdges);
+    const { weight } = dijkstra(startNode, endNode);
+    setOptimalPathWeight(weight);
+  };
+
+  const resetGraph = () => {
     setSelectedEdges([]);
     setLastClickedNode(startNode);
+    setTotalWeight(0);
     setGameOver(false);
     setMessage('');
     setReachedDestination(false);
   };
 
-  // Move to the next level
-  const playNextLevel = () => {
-    if (currentLevel < graphData.graphs.length - 1) {
-      const nextLevel = currentLevel + 1;
-      setCurrentLevel(nextLevel);
-      setNodes(graphData.graphs[nextLevel].nodes);
-      setEdges(graphData.graphs[nextLevel].edges);
-      setStartNode(graphData.graphs[nextLevel].startNode);
-      setEndNode(graphData.graphs[nextLevel].endNode);
-      playAgain();
-    } else {
-      setMessage('You have completed all levels!');
+  const undo = () => {
+    if (selectedEdges.length > 0 && !gameOver) {
+      const lastEdge = selectedEdges[selectedEdges.length - 1];
+      const newEdges = selectedEdges.slice(0, -1);
+      setSelectedEdges(newEdges);
+      setTotalWeight(
+        totalWeight - edges.find(
+          e => (e.from === lastEdge.from && e.to === lastEdge.to) || 
+               (e.from === lastEdge.to && e.to === lastEdge.from)
+        ).weight
+      );
+      setLastClickedNode(lastEdge.from);
+      setMessage('');
+      setReachedDestination(false);
     }
   };
 
-  // Undo the last step
-  const undo = () => {
-  if (selectedEdges.length > 0 && !gameOver) {
-    const lastEdge = selectedEdges[selectedEdges.length - 1];
-    const newEdges = selectedEdges.slice(0, -1);
-    setSelectedEdges(newEdges);
-    setTotalWeight(
-      totalWeight - edges.find(
-        e => (e.from === lastEdge.from && e.to === lastEdge.to) || 
-             (e.from === lastEdge.to && e.to === lastEdge.from)
-      ).weight
-    );
-    setLastClickedNode(lastEdge.from); // Go back to the previous node
-    setMessage(''); // Clear message
-    setReachedDestination(false); // Reset destination status
-  }
-};
+  const goHome = () => {
+    setMode('');
+    loadLevel(0);
+    setCurrentLevel(0);
+  };
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-      <Svg height="400" width="400">
-        {edges.map((edge, index) => {
-          const startNode = nodes.find(n => n.id === edge.from);
-          const endNode = nodes.find(n => n.id === edge.to);
+      {!mode ? (
+        <View style={{ marginBottom: 20 }}>
+          <Button title="Student Mode" onPress={() => setMode('student')} />
+          <Button title="Teacher Mode" onPress={() => setMode('teacher')} />
+        </View>
+      ) : (
+        <Svg height="400" width="400">
+          {edges.map((edge, index) => {
+            const startNode = nodes.find(n => n.id === edge.from);
+            const endNode = nodes.find(n => n.id === edge.to);
+            const midX = (startNode.x + endNode.x) / 2;
+            const midY = (startNode.y + endNode.y) / 2;
 
-          return (
-            <Line
-              key={index}
-              x1={startNode.x}
-              y1={startNode.y}
-              x2={endNode.x}
-              y2={endNode.y}
-              stroke={isEdgeSelected(edge.from, edge.to) ? 'green' : 'yellow'}
-              strokeWidth={isEdgeSelected(edge.from, edge.to) ? '3' : '2'}
+            return (
+              <React.Fragment key={index}>
+                <Line
+                  x1={startNode.x}
+                  y1={startNode.y}
+                  x2={endNode.x}
+                  y2={endNode.y}
+                  stroke={isEdgeSelected(edge.from, edge.to) ? 'green' : 'yellow'}
+                  strokeWidth={isEdgeSelected(edge.from, edge.to) ? '3' : '2'}
+                />
+                <SvgText
+                  x={midX}
+                  y={midY - 10}
+                  fill="black"
+                  fontSize="10"
+                  fontWeight="bold"
+                >
+                  {edge.weight}
+                </SvgText>
+              </React.Fragment>
+            );
+          })}
+
+          {nodes.map(node => (
+            <Circle
+              key={node.id}
+              cx={node.x}
+              cy={node.y}
+              r={20}
+              stroke="gray"
+              strokeWidth="2"
+              fill={node.id === startNode ? 'green' : node.id === endNode ? 'red' : 'blue'}
+              onPress={() => handleNodeClick(node.id)}
             />
-          );
-        })}
-
-        {nodes.map(node => (
-          <Circle
-            key={node.id}
-            cx={node.x}
-            cy={node.y}
-            r={20}
-            stroke="gray"
-            strokeWidth="2"
-            fill={node.id === startNode ? 'green' : node.id === endNode ? 'red' : 'blue'}
-            onPress={() => handleNodeClick(node.id)}
-          />
-        ))}
-
-        {nodes.map(node => (
-          <SvgText
-            key={node.id}
-            x={node.x - 5}
-            y={node.y + 5}
-            fill="white"
-            fontSize="12"
-            fontWeight="bold"
-          >
-            {node.id}
-          </SvgText>
-        ))}
-
-        {edges.map((edge, index) => {
-          const startNode = nodes.find(n => n.id === edge.from);
-          const endNode = nodes.find(n => n.id === edge.to);
-
-          return (
+          ))}
+          {nodes.map(node => (
             <SvgText
-              key={index}
-              x={(startNode.x + endNode.x) / 2}
-              y={(startNode.y + endNode.y) / 2}
-              fill="black"
-              fontSize="15"
+              key={node.id + '-label'}
+              x={node.x}
+              y={node.y + 5}
+              fill="white"
+              fontSize="12"
               fontWeight="bold"
             >
-              {edge.weight}
+              {node.id}
             </SvgText>
-          );
-        })}
-      </Svg>
+          ))}
+        </Svg>
+      )}
 
-      <Text style={{ marginTop: 20 }}>Total Weight: {totalWeight}</Text>
+      {mode === 'teacher' && !gameOver && (
+        <View style={{ flexDirection: 'column', alignItems: 'center', marginBottom: 10 }}>
+          <TextInput
+            style={{ borderWidth: 1, padding: 5, width: 80, marginBottom: 5 }}
+            placeholder="Min Weight"
+            keyboardType="numeric"
+            value={minWeight}
+            onChangeText={text => setMinWeight(text)}
+          />
+          <TextInput
+            style={{ borderWidth: 1, padding: 5, width: 80, marginBottom: 5 }}
+            placeholder="Max Weight"
+            keyboardType="numeric"
+            value={maxWeight}
+            onChangeText={text => setMaxWeight(text)}
+          />
+          <Button title="Generate New Weights" onPress={generateRandomEdges} />
+        </View>
+      )}
 
-      <Button title="Undo Last Step" onPress={undo} disabled={gameOver} style={{ marginTop: 20 }} />
-      <Button title="Check Path" onPress={checkPath} disabled={gameOver} style={{ marginTop: 10 }} />
+      <Text style={{ marginTop: 10 }}>Total Weight: {totalWeight}</Text>
 
-      {message !== '' && <Text style={{ marginTop: 10 }}>{message}</Text>}
+      <Text style={{ marginTop: 10 }}>{message}</Text>
 
       {gameOver && (
-        <Button
-          title={message.includes('Bravo') ? 'Next Level' : 'Play Again'}
-          onPress={message.includes('Bravo') ? playNextLevel : playAgain}
-          style={{ marginTop: 10 }}
-        />
+        <View style={{ marginVertical: 20 }}>
+          <Button title={message.includes('Bravo') ? "Next Level" : "Play Again"} onPress={playAgainOrNextLevel} />
+        </View>
       )}
+
+      <Button title="Undo" onPress={undo} />
+      <Button title="Check Path" onPress={checkPath} />
+      <Button title="Reset Graph" onPress={resetGraph} />
+
+      <TouchableOpacity
+        onPress={goHome}
+        style={{
+          position: 'absolute',
+          bottom: 20,
+          left: 20,
+          padding: 10,
+          borderRadius: 5,
+          backgroundColor: 'lightgray',
+        }}
+      >
+        <Text>Home</Text>
+      </TouchableOpacity>
     </View>
   );
 };
