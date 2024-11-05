@@ -56,7 +56,7 @@ npm install
 Launch the development server with:
 
 ```bash
-expo start
+npm start
 ```
 
 This command will open the Expo DevTools in your browser, where you can manage your project.
