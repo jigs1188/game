@@ -26,6 +26,15 @@ const Graph = () => {
     loadLevel(currentLevel);
   }, []);
 
+  const validateWeights = () => {
+    const min = parseInt(minWeight);
+    const max = parseInt(maxWeight);
+    if (isNaN(min) || isNaN(max) ||  max <= 0 || min >= max) {
+      Alert.alert('Invalid Weights', 'Ensure both max weights are positive, and max is greater than min.');
+      return false;
+    }
+    return true;
+  };
   // Dijkstra algorithm to calculate shortest path
   const dijkstra = (startNode, endNode) => {
     const distances = {};
@@ -142,24 +151,19 @@ const Graph = () => {
       return;
     }
 
-    const { shortestPath } = dijkstra(startNode, endNode);
-    const userPath = [startNode, ...selectedEdges.map(edge => edge.to)];
+    const isWeightCorrect = totalWeight === optimalPathWeight;
 
-    const isPathCorrect =
-      userPath.length === shortestPath.length &&
-      userPath.every((node, index) => node === shortestPath[index]);
-
-    if (isPathCorrect) {
-      setMessage('Bravo! You found the optimal path!');
+    if (isWeightCorrect) {
+      setMessage('Bravo! You found the optimal path weight!');
       setGameOver(true);
     } else {
-      setMessage('Sorry, you lost! Try again.');
+      setMessage('Sorry, your path weight is not optimal. Try again.');
       setGameOver(true);
     }
   };
 
   const playAgainOrNextLevel = () => {
-    if (message === 'Bravo! You found the optimal path!') {
+    if (message === 'Bravo! You found the optimal path weight!') {
       setCurrentLevel(currentLevel + 1);
       loadLevel(currentLevel + 1);
     } else {
@@ -168,6 +172,7 @@ const Graph = () => {
   };
 
   const generateRandomEdges = () => {
+    if (!validateWeights()) return;
     const newEdges = edges.map(edge => ({
       ...edge,
       weight: Math.floor(Math.random() * (parseInt(maxWeight) - parseInt(minWeight) + 1)) + parseInt(minWeight),
