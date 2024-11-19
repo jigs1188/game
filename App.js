@@ -21,7 +21,6 @@ const Graph = () => {
   const [maxWeight, setMaxWeight] = useState('');
   const [mode, setMode] = useState(''); // '' | 'student' | 'teacher'
 
-  // Load the initial level data when the component mounts
   useEffect(() => {
     loadLevel(currentLevel);
   }, []);
@@ -29,13 +28,91 @@ const Graph = () => {
   const validateWeights = () => {
     const min = parseInt(minWeight);
     const max = parseInt(maxWeight);
-    if (isNaN(min) || isNaN(max) ||  max <= 0 || min >= max) {
+    if (isNaN(min) || isNaN(max) || max <= 0 || min >= max) {
       Alert.alert('Invalid Weights', 'Ensure both max weights are positive, and max is greater than min.');
       return false;
     }
     return true;
   };
-  // Dijkstra algorithm to calculate shortest path
+
+  const bellmanFord = (startNode) => {
+    const distances = {};
+    const predecessors = {};
+
+    nodes.forEach((node) => {
+      distances[node.id] = Infinity;
+      predecessors[node.id] = null;
+    });
+
+    distances[startNode] = 0;
+
+    for (let i = 0; i < nodes.length - 1; i++) {
+      edges.forEach((edge) => {
+        if (distances[edge.from] + edge.weight < distances[edge.to]) {
+          distances[edge.to] = distances[edge.from] + edge.weight;
+          predecessors[edge.to] = edge.from;
+        }
+      });
+    }
+
+    const negativeCycleEdges = [];
+
+    edges.forEach((edge) => {
+      if (distances[edge.from] + edge.weight < distances[edge.to]) {
+        negativeCycleEdges.push(edge);
+      }
+    });
+
+    return { negativeCycleEdges, distances, predecessors };
+  };
+
+  const adjustNegativeCycles = () => {
+    const MAX_ITERATIONS = 100; // Limit regeneration attempts
+    let attempts = 0;
+  
+    while (attempts < MAX_ITERATIONS) {
+      const { distances, negativeCycleEdges } = bellmanFord(startNode);
+  
+      if (distances[endNode] >= 0) {
+        break; // Positive destination path found
+      }
+  
+      if (negativeCycleEdges.length > 0) {
+        regenerateWeights(); // Attempt to resolve by weight changes
+      }
+  
+      attempts++;
+    }
+  
+    if (attempts >= MAX_ITERATIONS) {
+      // Alert.alert('Failed to ensure positive path', 'Could not resolve the negative destination path.');
+    }
+  };
+  
+  const regenerateWeights = () => {
+    const totalNodes = nodes.length;
+    let edgePosBalance = Math.ceil(totalNodes / 3); // Ensuring more positive paths
+  
+    let newEdges;
+    let negativeCycleEdges;
+  
+    do {
+      newEdges = edges.map((edge) => {
+        const weight = edgePosBalance > 0 && Math.random() < 0.8
+          ? Math.floor(Math.random() * maxWeight) + 1 // Positive weight
+          : Math.floor(Math.random() * minWeight * -1); // Negative weight
+        edgePosBalance -= weight > 0 ? 1 : 0;
+  
+        return { ...edge, weight };
+      });
+  
+      const { negativeCycleEdges: currentNegativeCycleEdges } = bellmanFord(startNode);
+      negativeCycleEdges = currentNegativeCycleEdges;
+    } while (negativeCycleEdges.length > 0);
+  
+    setEdges(newEdges);
+  };
+
   const dijkstra = (startNode, endNode) => {
     const distances = {};
     const previousNodes = {};
@@ -80,6 +157,7 @@ const Graph = () => {
     return { shortestPath, weight: distances[endNode] };
   };
 
+  
   const loadLevel = (level) => {
     if (level < graphData.graphs.length) {
       const graph = graphData.graphs[level];
@@ -87,21 +165,36 @@ const Graph = () => {
       setEdges(graph.edges);
       setStartNode(graph.startNode);
       setEndNode(graph.endNode);
-      setLastClickedNode(graph.startNode); // Reset last clicked node to start node
+      setLastClickedNode(graph.startNode);
       setTotalWeight(0);
       setSelectedEdges([]);
       setGameOver(false);
       setMessage('');
       setReachedDestination(false);
-
-      // Calculate the optimal path for the new level
+  
+      adjustNegativeCycles(); // Detect or resolve any negative cycle for this level
       const { weight } = dijkstra(graph.startNode, graph.endNode);
-      setOptimalPathWeight(weight);
+      setOptimalPathWeight(weight); // Always reflect valid optimal paths
     } else {
-      setMessage('Congratulations! You completed all levels.');
+      setMessage('Congratulations! All levels completed.');
     }
   };
-
+  
+  const resetGraph = () => {
+    setSelectedEdges([]);
+    setLastClickedNode(startNode);
+    setTotalWeight(0);
+    setGameOver(false);
+    setMessage('');
+    setReachedDestination(false);
+  
+    adjustNegativeCycles(); // Revalidate paths if user resets during level
+    const { weight } = dijkstra(startNode, endNode);
+    setOptimalPathWeight(weight);
+  };
+  
+  
+ 
   useEffect(() => {
     if (startNode && endNode) {
       const { weight } = dijkstra(startNode, endNode);
@@ -182,14 +275,14 @@ const Graph = () => {
     setOptimalPathWeight(weight);
   };
 
-  const resetGraph = () => {
-    setSelectedEdges([]);
-    setLastClickedNode(startNode);
-    setTotalWeight(0);
-    setGameOver(false);
-    setMessage('');
-    setReachedDestination(false);
-  };
+  // const resetGraph = () => {
+  //   setSelectedEdges([]);
+  //   setLastClickedNode(startNode);
+  //   setTotalWeight(0);
+  //   setGameOver(false);
+  //   setMessage('');
+  //   setReachedDestination(false);
+  // };
 
   const undo = () => {
     if (selectedEdges.length > 0 && !gameOver) {
