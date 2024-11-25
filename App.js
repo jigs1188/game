@@ -3,7 +3,13 @@ import { View, Text, Button, Alert, TextInput, TouchableOpacity } from 'react-na
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
 import graphData from './assets/graph.json';
 
+/**
+ * Graph component to visualize and interact with graph data.
+ * Allows users to find the shortest path using Dijkstra's algorithm,
+ * and handles negative cycles using Bellman-Ford.
+ */
 const Graph = () => {
+  // State variables for nodes, edges, and game state
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [startNode, setStartNode] = useState(null);
@@ -16,15 +22,19 @@ const Graph = () => {
   const [lastClickedNode, setLastClickedNode] = useState(null);
   const [optimalPathWeight, setOptimalPathWeight] = useState(null);
   const [reachedDestination, setReachedDestination] = useState(false);
-
   const [minWeight, setMinWeight] = useState('');
   const [maxWeight, setMaxWeight] = useState('');
   const [mode, setMode] = useState(''); // '' | 'student' | 'teacher'
 
+  // Load the current level when the component mounts
   useEffect(() => {
     loadLevel(currentLevel);
   }, []);
 
+  /**
+   * Validates the minimum and maximum weights inputted by the user.
+   * @returns {boolean} True if weights are valid, false otherwise.
+   */
   const validateWeights = () => {
     const min = parseInt(minWeight);
     const max = parseInt(maxWeight);
@@ -35,6 +45,11 @@ const Graph = () => {
     return true;
   };
 
+  /**
+   * Bellman-Ford algorithm to detect negative cycles in the graph.
+   * @param {number} startNode - The starting node ID.
+   * @returns {object} Contains negative cycle edges, distances, and predecessors.
+   */
   const bellmanFord = (startNode) => {
     const distances = {};
     const predecessors = {};
@@ -66,53 +81,57 @@ const Graph = () => {
     return { negativeCycleEdges, distances, predecessors };
   };
 
+  /**
+   * Adjusts the graph to resolve negative cycles by regenerating edge weights.
+   */
   const adjustNegativeCycles = () => {
-    const MAX_ITERATIONS = 100; // Limit regeneration attempts
+    const MAX_ITERATIONS = 100;
     let attempts = 0;
-  
+
     while (attempts < MAX_ITERATIONS) {
-      const { distances, negativeCycleEdges } = bellmanFord(startNode);
-  
-      if (distances[endNode] >= 0) {
-        break; // Positive destination path found
+      const { negativeCycleEdges } = bellmanFord(startNode);
+      if (negativeCycleEdges.length === 0) {
+        const { weight } = dijkstra(startNode, endNode);
+        setOptimalPathWeight(weight);
+        return;
       }
-  
-      if (negativeCycleEdges.length > 0) {
-        regenerateWeights(); // Attempt to resolve by weight changes
-      }
-  
+      regenerateWeights();
       attempts++;
     }
-  
+
     if (attempts >= MAX_ITERATIONS) {
-      // Alert.alert('Failed to ensure positive path', 'Could not resolve the negative destination path.');
+      Alert.alert(
+        'Failed to Resolve Negative Cycles',
+        'The system was unable to resolve negative cycles after multiple attempts.'
+      );
     }
   };
-  
+
+  /**
+   * Regenerates edge weights to ensure more positive paths.
+   */
   const regenerateWeights = () => {
     const totalNodes = nodes.length;
-    let edgePosBalance = Math.ceil(totalNodes / 3); // Ensuring more positive paths
-  
-    let newEdges;
-    let negativeCycleEdges;
-  
-    do {
-      newEdges = edges.map((edge) => {
-        const weight = edgePosBalance > 0 && Math.random() < 0.8
-          ? Math.floor(Math.random() * maxWeight) + 1 // Positive weight
-          : Math.floor(Math.random() * minWeight * -1); // Negative weight
-        edgePosBalance -= weight > 0 ? 1 : 0;
-  
-        return { ...edge, weight };
-      });
-  
-      const { negativeCycleEdges: currentNegativeCycleEdges } = bellmanFord(startNode);
-      negativeCycleEdges = currentNegativeCycleEdges;
-    } while (negativeCycleEdges.length > 0);
-  
+    let edgePosBalance = Math.ceil(totalNodes / 3);
+
+    const newEdges = edges.map((edge) => {
+      const weight = edgePosBalance > 0 && Math.random() < 0.8
+        ? Math.floor(Math.random() * maxWeight) + 1
+        : Math.floor(Math.random() * minWeight * -1);
+      edgePosBalance -= weight > 0 ? 1 : 0;
+
+      return { ...edge, weight };
+    });
+
     setEdges(newEdges);
   };
 
+  /**
+   * Dijkstra's algorithm to find the shortest path from startNode to endNode.
+   * @param {number} startNode - The starting node ID.
+   * @param {number} endNode - The ending node ID.
+   * @returns {object} Contains the shortest path and its weight.
+   */
   const dijkstra = (startNode, endNode) => {
     const distances = {};
     const previousNodes = {};
@@ -157,7 +176,10 @@ const Graph = () => {
     return { shortestPath, weight: distances[endNode] };
   };
 
-  
+  /**
+   * Loads the level specified by index, setting up nodes, edges, and start/end nodes.
+   * @param {number} level - The level index to load.
+   */
   const loadLevel = (level) => {
     if (level < graphData.graphs.length) {
       const graph = graphData.graphs[level];
@@ -171,15 +193,17 @@ const Graph = () => {
       setGameOver(false);
       setMessage('');
       setReachedDestination(false);
-  
-      adjustNegativeCycles(); // Detect or resolve any negative cycle for this level
-      const { weight } = dijkstra(graph.startNode, graph.endNode);
-      setOptimalPathWeight(weight); // Always reflect valid optimal paths
+      setCurrentLevel(level);
+
+      adjustNegativeCycles();
     } else {
       setMessage('Congratulations! All levels completed.');
     }
   };
-  
+
+  /**
+   * Resets the graph to its initial state for the current level.
+   */
   const resetGraph = () => {
     setSelectedEdges([]);
     setLastClickedNode(startNode);
@@ -187,14 +211,11 @@ const Graph = () => {
     setGameOver(false);
     setMessage('');
     setReachedDestination(false);
-  
-    adjustNegativeCycles(); // Revalidate paths if user resets during level
-    const { weight } = dijkstra(startNode, endNode);
-    setOptimalPathWeight(weight);
+
+    adjustNegativeCycles();
   };
-  
-  
- 
+
+  // Update optimal path weight whenever startNode or endNode changes
   useEffect(() => {
     if (startNode && endNode) {
       const { weight } = dijkstra(startNode, endNode);
@@ -202,25 +223,32 @@ const Graph = () => {
     }
   }, [startNode, endNode, nodes, edges]);
 
+  /**
+   * Displays the running total weight by adding the additional weight.
+   * @param {number} additionalWeight - The weight to add to the total.
+   */
   const displayRunningTotal = (additionalWeight) => {
     setTotalWeight(prevWeight => prevWeight + additionalWeight);
   };
-  
 
+  /**
+   * Handles node click events to update the path and check if the destination is reached.
+   * @param {number} currentNode - The currently clicked node ID.
+   */
   const handleNodeClick = (currentNode) => {
     if (gameOver || lastClickedNode === currentNode || reachedDestination) return;
-  
+
     const edge = edges.find(
       e =>
         (e.from === lastClickedNode && e.to === currentNode) ||
         (e.from === currentNode && e.to === lastClickedNode)
     );
-  
+
     if (edge) {
       const newEdge = { from: lastClickedNode, to: currentNode };
       setSelectedEdges([...selectedEdges, newEdge]);
       displayRunningTotal(edge.weight);
-  
+
       if (currentNode === endNode) {
         setReachedDestination(true);
         setMessage('You have reached the destination!');
@@ -231,22 +259,29 @@ const Graph = () => {
       Alert.alert('Invalid move', 'There is no direct path between these nodes.');
     }
   };
-  
+
+  /**
+   * Checks if an edge is selected by the user.
+   * @param {number} from - The starting node ID of the edge.
+   * @param {number} to - The ending node ID of the edge.
+   * @returns {boolean} True if the edge is selected, false otherwise.
+   */
   const isEdgeSelected = (from, to) => {
     return selectedEdges.some(
       edge => (edge.from === from && edge.to === to) || (edge.from === to && edge.to === from)
     );
   };
 
+  /**
+   * Checks the current path against the optimal path weight and updates the message.
+   */
   const checkPath = () => {
     if (!reachedDestination) {
       setMessage("Keep going, you haven't reached the destination yet.");
       return;
     }
 
-    const isWeightCorrect = totalWeight === optimalPathWeight;
-
-    if (isWeightCorrect) {
+    if (totalWeight <= optimalPathWeight) {
       setMessage('Bravo! You found the optimal path weight!');
       setGameOver(true);
     } else {
@@ -255,15 +290,29 @@ const Graph = () => {
     }
   };
 
+  /**
+   * Handles the action to play again or proceed to the next level.
+   */
   const playAgainOrNextLevel = () => {
     if (message === 'Bravo! You found the optimal path weight!') {
       setCurrentLevel(currentLevel + 1);
       loadLevel(currentLevel + 1);
     } else {
-      loadLevel(currentLevel);
+      // loadLevel(currentLevel);
+      setSelectedEdges([]);
+    setLastClickedNode(startNode);
+    setTotalWeight(0);
+    setGameOver(false);
+    setMessage('');
+    setReachedDestination(false);
+
+    adjustNegativeCycles();
     }
   };
 
+  /**
+   * Randomly generates new edge weights within the specified range.
+   */
   const generateRandomEdges = () => {
     if (!validateWeights()) return;
     const newEdges = edges.map(edge => ({
@@ -275,15 +324,9 @@ const Graph = () => {
     setOptimalPathWeight(weight);
   };
 
-  // const resetGraph = () => {
-  //   setSelectedEdges([]);
-  //   setLastClickedNode(startNode);
-  //   setTotalWeight(0);
-  //   setGameOver(false);
-  //   setMessage('');
-  //   setReachedDestination(false);
-  // };
-
+  /**
+   * Undoes the last selected edge, reverting the path to its previous state.
+   */
   const undo = () => {
     if (selectedEdges.length > 0 && !gameOver) {
       const lastEdge = selectedEdges[selectedEdges.length - 1];
@@ -301,6 +344,9 @@ const Graph = () => {
     }
   };
 
+  /**
+   * Resets the mode and loads the first level, simulating a 'home' action.
+   */
   const goHome = () => {
     setMode('');
     loadLevel(0);
@@ -309,12 +355,16 @@ const Graph = () => {
 
   return (
     <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      {/* Home Page */}
       {!mode ? (
-        <View style={{ marginBottom: 20 }}>
+        <View style={{ marginBottom: 20, justifyContent: 'center', alignItems: 'center' }}>
+          <Text style={{ fontSize: 24, fontWeight: 'bold', marginBottom: 20 }}>Select Mode</Text>
           <Button title="Student Mode" onPress={() => setMode('student')} />
+          <View style={{ marginVertical: 10 }} />
           <Button title="Teacher Mode" onPress={() => setMode('teacher')} />
         </View>
       ) : (
+        /* Game UI */
         <Svg height="400" width="400">
           {edges.map((edge, index) => {
             const startNode = nodes.find(n => n.id === edge.from);
@@ -372,6 +422,7 @@ const Graph = () => {
         </Svg>
       )}
 
+      {/* Teacher Mode UI */}
       {mode === 'teacher' && !gameOver && (
         <View style={{ flexDirection: 'column', alignItems: 'center', marginBottom: 10 }}>
           <TextInput
@@ -392,20 +443,25 @@ const Graph = () => {
         </View>
       )}
 
-      <Text style={{ marginTop: 10 }}>Total Weight: {totalWeight}</Text>
+      {/* Common Game Controls */}
+      {mode && (
+        <>
+          <Text style={{ marginTop: 10 }}>Total Weight: {totalWeight}</Text>
+          <Text style={{ marginTop: 10 }}>{message}</Text>
 
-      <Text style={{ marginTop: 10 }}>{message}</Text>
+          {gameOver && (
+            <View style={{ marginVertical: 20 }}>
+              <Button title={message.includes('Bravo') ? "Next Level" : "Play Again"} onPress={playAgainOrNextLevel} />
+            </View>
+          )}
 
-      {gameOver && (
-        <View style={{ marginVertical: 20 }}>
-          <Button title={message.includes('Bravo') ? "Next Level" : "Play Again"} onPress={playAgainOrNextLevel} />
-        </View>
+          <Button title="Undo" onPress={undo} />
+          <Button title="Check Path" onPress={checkPath} />
+          <Button title="Reset Graph" onPress={resetGraph} />
+        </>
       )}
 
-      <Button title="Undo" onPress={undo} />
-      <Button title="Check Path" onPress={checkPath} />
-      <Button title="Reset Graph" onPress={resetGraph} />
-
+      {/* Home Button */}
       <TouchableOpacity
         onPress={goHome}
         style={{
