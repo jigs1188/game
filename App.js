@@ -13,9 +13,11 @@ const Graph = () => {
   const [nodes, setNodes] = useState([]);
   const [edges, setEdges] = useState([]);
   const [startNode, setStartNode] = useState(null);
+
   const [endNode, setEndNode] = useState(null);
   const [totalWeight, setTotalWeight] = useState(0);
   const [gameOver, setGameOver] = useState(false);
+
   const [message, setMessage] = useState('');
   const [currentLevel, setCurrentLevel] = useState(0);
   const [selectedEdges, setSelectedEdges] = useState([]);
@@ -45,22 +47,21 @@ const Graph = () => {
     return true;
   };
 
-  /**
-   * Bellman-Ford algorithm to detect negative cycles in the graph.
-   * @param {number} startNode - The starting node ID.
-   * @returns {object} Contains negative cycle edges, distances, and predecessors.
-   */
+  
+
   const bellmanFord = (startNode) => {
     const distances = {};
     const predecessors = {};
-
+  
+    // Step 1: Initialize distances and predecessors
     nodes.forEach((node) => {
       distances[node.id] = Infinity;
       predecessors[node.id] = null;
     });
-
+  
     distances[startNode] = 0;
-
+  
+    // Step 2: Relax all edges |V| - 1 times
     for (let i = 0; i < nodes.length - 1; i++) {
       edges.forEach((edge) => {
         if (distances[edge.from] + edge.weight < distances[edge.to]) {
@@ -69,77 +70,117 @@ const Graph = () => {
         }
       });
     }
-
-    const negativeCycleEdges = [];
-
+  
+    // Step 3: Check for negative weight cycles
+    let negativeCycleNodes = [];
+    let negativeCycleEdges = [];
+    let cycleStart = null;
+  
     edges.forEach((edge) => {
       if (distances[edge.from] + edge.weight < distances[edge.to]) {
-        negativeCycleEdges.push(edge);
+        cycleStart = edge.to; // Found a node in the negative cycle
       }
     });
-
-    return { negativeCycleEdges, distances, predecessors };
+  
+    if (cycleStart) {
+      let visited = new Set();
+  
+      // Trace back the cycle
+      let currentNode = cycleStart;
+      for (let i = 0; i < nodes.length; i++) {
+        currentNode = predecessors[currentNode];
+      }
+  
+      let cycleNode = currentNode;
+      do {
+        negativeCycleNodes.push(cycleNode);
+        visited.add(cycleNode);
+        const edge = edges.find(
+          (e) => e.from === predecessors[cycleNode] && e.to === cycleNode
+        );
+        if (edge) {
+          negativeCycleEdges.push(edge);
+        }
+        cycleNode = predecessors[cycleNode];
+      } while (!visited.has(cycleNode));
+  
+      negativeCycleNodes.push(cycleNode); // Close the cycle
+    }
+  
+    return {
+      negativeCycleEdges,
+      negativeCycleNodes,
+      distances,
+      predecessors,
+    };
   };
-
+  
   /**
    * Adjusts the graph to resolve negative cycles by regenerating edge weights.
    */
   const adjustNegativeCycles = () => {
     const MAX_ITERATIONS = 100;
     let attempts = 0;
-
+  
     while (attempts < MAX_ITERATIONS) {
       const { negativeCycleEdges } = bellmanFord(startNode);
+  
       if (negativeCycleEdges.length === 0) {
+        // No negative cycles, compute the optimal path
         const { weight } = dijkstra(startNode, endNode);
         setOptimalPathWeight(weight);
         return;
       }
-      regenerateWeights();
+  
+      // Adjust weights to resolve the negative cycle
+      adjustWeightsToResolveCycle(negativeCycleEdges);
       attempts++;
     }
-
-    if (attempts >= MAX_ITERATIONS) {
-      Alert.alert(
-        'Failed to Resolve Negative Cycles',
-        'The system was unable to resolve negative cycles after multiple attempts.'
-      );
-    }
+  
+    // If cycles persist after multiple attempts
+    Alert.alert(
+      'Failed to Resolve Negative Cycles',
+      'The system was unable to resolve negative cycles after multiple attempts.'
+    );
   };
-
-  /**
-   * Regenerates edge weights to ensure more positive paths.
-   */
-  const regenerateWeights = () => {
-    const totalNodes = nodes.length;
-    let edgePosBalance = Math.ceil(totalNodes / 3);
-
+  
+  const adjustWeightsToResolveCycle = (negativeCycleEdges) => {
+    // Calculate the total weight of the negative cycle
+    const totalCycleWeight = negativeCycleEdges.reduce((sum, edge) => sum + edge.weight, 0);
+  
+    // Calculate the required increment to make the cycle weight positive
+    const requiredIncrement = Math.abs(totalCycleWeight) + 1;
+  
+    // Adjust the weights of edges in the negative cycle
     const newEdges = edges.map((edge) => {
-      const weight = edgePosBalance > 0 && Math.random() < 0.8
-        ? Math.floor(Math.random() * maxWeight) + 1
-        : Math.floor(Math.random() * minWeight * -1);
-      edgePosBalance -= weight > 0 ? 1 : 0;
-
-      return { ...edge, weight };
+      if (negativeCycleEdges.some((cycleEdge) => cycleEdge.from === edge.from && cycleEdge.to === edge.to)) {
+        // Increment the edge weight to resolve the negative cycle
+        return {
+          ...edge,
+          weight: edge.weight + requiredIncrement,
+        };
+      }
+      return edge; // Keep other edges unchanged
     });
-
+  
     setEdges(newEdges);
   };
+  
 
   /**
    * Dijkstra's algorithm to find the shortest path from startNode to endNode.
-   * @param {number} startNode - The starting node ID.
-   * @param {number} endNode - The ending node ID.
-   * @returns {object} Contains the shortest path and its weight.
+   
    */
   const dijkstra = (startNode, endNode) => {
     const distances = {};
     const previousNodes = {};
+    // Clone the nodes array to keep track of unvisited nodes
     const unvisitedNodes = nodes.slice();
 
     nodes.forEach(node => {
       distances[node.id] = Infinity;
     });
+
     distances[startNode] = 0;
     previousNodes[startNode] = null;
 
