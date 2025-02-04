@@ -1,3 +1,6 @@
+import { OperationType } from "firebase/auth";
+
+// Algorithms.js
 export const dijkstra = (nodes, edges, startNode, endNode) => {
   const distances = {};
   const previousNodes = {};
@@ -43,20 +46,28 @@ export const dijkstra = (nodes, edges, startNode, endNode) => {
   return { shortestPath, weight: distances[endNode] };
 };
 
-export const bellmanFord = (nodes, edges, startNode, endNode) => {
+// Algorithms.js (Final Bellman-Ford Implementation)
+export const bellmanFord = (nodes, originalEdges, startNode, endNode) => {
   const distances = {};
   const predecessors = {};
+  const edges = originalEdges.filter(edge => edge.from !== endNode);
 
   nodes.forEach(node => {
     distances[node.id] = Infinity;
     predecessors[node.id] = null;
   });
-
   distances[startNode] = 0;
+
+  // Create virtual undirected edges (not stored)
+  const undirectedEdges = [];
+  edges.forEach(edge => {
+    undirectedEdges.push(edge);
+    undirectedEdges.push({...edge, from: edge.to, to: edge.from});
+  });
 
   // Relax edges |V| - 1 times
   for (let i = 0; i < nodes.length - 1; i++) {
-    edges.forEach(edge => {
+    undirectedEdges.forEach(edge => {
       if (distances[edge.from] + edge.weight < distances[edge.to]) {
         distances[edge.to] = distances[edge.from] + edge.weight;
         predecessors[edge.to] = edge.from;
@@ -64,76 +75,111 @@ export const bellmanFord = (nodes, edges, startNode, endNode) => {
     });
   }
 
-  // Detect negative cycles
-  const negativeCycle = [];
-  edges.forEach(edge => {
+
+  // Detect negative cycles excluding endNode
+  const inNegativeCycle = new Set();
+  undirectedEdges.forEach(edge => {
     if (distances[edge.from] + edge.weight < distances[edge.to]) {
-      let cycleStart = edge.to;
-      for (let i = 0; i < nodes.length; i++) {
-        cycleStart = predecessors[cycleStart];
+      let node = edge.to;
+      const visited = new Set();
+
+      while (node !== null && !visited.has(node)) {
+        visited.add(node);
+        node = predecessors[node];
       }
 
-      // Collect edges in the negative cycle
-      let currentNode = cycleStart;
-      do {
-        negativeCycle.push(
-          edges.find(e => e.from === predecessors[currentNode] && e.to === currentNode)
-        );
-        currentNode = predecessors[currentNode];
-      } while (currentNode !== cycleStart);
-
-      return;
+      if (node !== null && node !== endNode) {
+        let current = node;
+        do {
+          inNegativeCycle.add(current);
+          current = predecessors[current];
+        } while (current !== node && current !== null);
+      }
     }
   });
 
-  if (negativeCycle.length > 0) {
-    // Adjust edges to fix the negative cycle
-    const adjustedEdges = adjustNegativeCycle(edges, negativeCycle);
+  if (inNegativeCycle.size > 0) {
+    const negativeCycleEdges = undirectedEdges.filter(edge => 
+      inNegativeCycle.has(edge.from) && inNegativeCycle.has(edge.to)
+    );
 
+    const adjustedEdges = adjustNegativeCycle(edges, negativeCycleEdges);
     return { 
       shortestPath: [], 
       weight: Infinity, 
-      negativeCycleEdges: negativeCycle, 
+      negativeCycleEdges,
       adjustedEdges 
     };
   }
 
-  // Reconstruct the optimal path
+  // Reconstruct path
   const shortestPath = [];
   let currentNode = endNode;
-
-  while (currentNode) {
+  while (currentNode !== null) {
     shortestPath.unshift(currentNode);
     currentNode = predecessors[currentNode];
   }
 
-  return { shortestPath, weight: distances[endNode], negativeCycleEdges: [], adjustedEdges: edges };
+  return { 
+    shortestPath,
+    weight: distances[endNode],
+    negativeCycleEdges: [],
+    adjustedEdges: edges
+  };
 };
 
-// Adjusts the weights in a negative cycle
-const adjustNegativeCycle = (edges, negativeCycleEdges) => {
-  const cycleWeight = negativeCycleEdges.reduce((sum, edge) => sum + edge.weight, 0);
-  const adjustment = Math.abs(cycleWeight) + 1;
+// Algorithms.js
+const adjustNegativeCycle = (originalEdges, negativeCycleEdges) => {
+  // Calculate total negative weight in the cycle
+  let cycleWeight = negativeCycleEdges.reduce((sum, edge) => sum + edge.weight, 0);
+  
+  // Calculate minimum adjustment needed per edge to make cycle positive
+  const numEdgesInCycle = negativeCycleEdges.length;
+  const adjustmentPerEdge = Math.ceil(Math.abs(cycleWeight) / numEdgesInCycle) + 1;
 
-  const adjustedEdges = edges.map(edge => {
-    if (negativeCycleEdges.includes(edge)) {
-      return { ...edge, weight: edge.weight + adjustment };
-    }
-    return edge;
+  return originalEdges.map(edge => {
+    const isInCycle = negativeCycleEdges.some(e => 
+      (e.from === edge.from && e.to === edge.to) ||
+      (e.to === edge.from && e.from === edge.to) // Undirected check
+    );
+    return isInCycle ? { 
+      ...edge, 
+      weight: edge.weight + adjustmentPerEdge 
+    } : edge;
   });
-
-  return adjustedEdges;
 };
 
-// When to use Dijkstra or Bellman-Ford
-export const calculateOptimalPath = (nodes, edges, startNode, endNode) => {
-  const hasNegativeWeights = edges.some(edge => edge.weight < 0);
+export const calculateOptimalPath = (nodes, edges, startNode, endNode, operation = 'sum') => {
+  // Convert edges for multiplication using precise logarithmic conversion
+  const operationEdges = operation === 'multiplication' 
+    ? edges.map(edge => ({
+        ...edge,
+        weight: Math.log(edge.weight)
+      }))
+    : edges;
 
-  if (hasNegativeWeights) {
-    console.log("Using Bellman-Ford as graph contains negative weights.");
-    return bellmanFord(nodes, edges, startNode, endNode);
-  } else {
-    console.log("Using Dijkstra as graph has only positive weights.");
-    return dijkstra(nodes, edges, startNode, endNode);
+  // Filter out edges originating from endNode
+  const filteredEdges = operationEdges.filter(edge => edge.from !== endNode);
+
+  const hasNegativeWeights = filteredEdges.some(edge => edge.weight < 0);
+  
+  let result;
+  try {
+    result = hasNegativeWeights
+      ? bellmanFord(nodes, filteredEdges, startNode, endNode)
+      : dijkstra(nodes, filteredEdges, startNode, endNode);
+  } catch (error) {
+    console.error("Path calculation error:", error);
+    return { weight: Infinity };
   }
+
+  // Convert back with precise rounding
+  if (operation === 'multiplication') {
+    const EXP_TOLERANCE = 1e-10;
+    const rawWeight = Math.exp(result.weight);
+    const roundedWeight = Math.round((rawWeight + EXP_TOLERANCE) * 1e6) / 1e6;
+    return { ...result, weight: roundedWeight };
+  }
+  
+  return result;
 };

@@ -1,4 +1,5 @@
 import { StyleSheet } from 'react-native';
+import { Button } from 'react-native-web';
 
 export const styles = StyleSheet.create({
   container: {
@@ -29,7 +30,7 @@ export const styles = StyleSheet.create({
   teacherControls: {
     flexDirection: 'column',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 20,
   },
   inputBox: {
     borderWidth: 1,
@@ -51,4 +52,17 @@ export const styles = StyleSheet.create({
     borderRadius: 5,
     backgroundColor: 'lightgray',
   },
+  teacherControls: {
+    marginVertical: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
+  button:{
+  // flexDirection: 'row',
+  //   backgroundColor: 'lightgray',
+  //   padding: 10,
+  //   borderRadius: 5,
+  //   margin: 5,
+  },
+  
 });

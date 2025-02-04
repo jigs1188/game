@@ -1,3 +1,4 @@
+// App.js
 import React, { useState, useEffect } from 'react';
 import { View, Text, Button, Alert, TextInput, TouchableOpacity } from 'react-native';
 import Svg, { Circle, Line, Text as SvgText } from 'react-native-svg';
@@ -26,6 +27,8 @@ const Graph = () => {
   const [mode, setMode] = useState(''); // '' | 'student' | 'teacher' 
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [user, setUser] = useState(null);
+  const [teacherOperation, setTeacherOperation] = useState('sum'); // 'sum' | 'multiplication'
+
 
 
   // useEffect(() => {
@@ -48,12 +51,16 @@ const Graph = () => {
     return true;
   };
 
-  
+   
 
 
   const loadLevel = (level) => {
     if (level < graphData.graphs.length) {
       const graph = graphData.graphs[level];
+
+      
+
+            
       setNodes(graph.nodes);
       setEdges(graph.edges);
       setStartNode(graph.startNode);
@@ -83,17 +90,24 @@ const Graph = () => {
 
   };
 
-  useEffect(() => {
-    if (startNode && endNode) {
-      const { weight } = calculateOptimalPath(nodes,edges,startNode, endNode);
-      setOptimalPathWeight(weight);
-    }
-  }, [startNode, endNode, nodes, edges]);
+  // App.js
+useEffect(() => {
+  if (startNode && endNode) {
+    const { weight } = calculateOptimalPath(
+      nodes,
+      edges,
+      startNode,
+      endNode,
+      teacherOperation
+    );
+    setOptimalPathWeight(weight);
+  }
+}, [startNode, endNode, nodes, edges, teacherOperation]);
 
 
-  const displayRunningTotal = (additionalWeight) => {
-    setTotalWeight(prevWeight => prevWeight + additionalWeight);
-  };
+  // const displayRunningTotal = (additionalWeight) => {
+  //   setTotalWeight(prevWeight => prevWeight + additionalWeight);
+  // };
 
 
   const handleNodeClick = (currentNode) => {
@@ -135,7 +149,19 @@ const Graph = () => {
       return;
     }
 
-    if (totalWeight <= optimalPathWeight) {
+    const precision = teacherOperation === 'multiplication' ? 1e-6 : 0;
+    const isValid = Math.abs(totalWeight - optimalPathWeight) <= precision;
+
+    if (isValid) {
+      setMessage('Bravo! You found the optimal path weight!');
+      setGameOver(true);
+    } else {
+      setMessage(`Sorry, your path weight (${totalWeight}) is not optimal (${optimalPathWeight})`);
+      setGameOver(true);
+    }
+  
+
+    if (totalWeight == optimalPathWeight) {
       setMessage('Bravo! You found the optimal path weight!');
       setGameOver(true);
     } else {
@@ -165,31 +191,44 @@ const Graph = () => {
 
   const handleNegativeCycleAdjustment = () => {
     const result = bellmanFord(nodes, edges, startNode, endNode);
-  
     if (result.negativeCycleEdges.length > 0) {
-      console.log("Negative cycle detected and resolved.");
-      setEdges(result.adjustedEdges); // Update the graph
+      setEdges(result.adjustedEdges); // Update with adjusted edges
+
+
+
+
+      Alert.alert("Negative cycle fixed! Weights adjusted.");
     } else {
-      console.log("No negative cycle detected.");
+      Alert.alert("No negative cycles detected.");
     }
   };
-  
-
  
   /**
    * Randomly generates new edge weights within the specified range.
    */
-  const generateRandomEdges = () => {
-    if (!validateWeights()) return;
-    const newEdges = edges.map(edge => ({
-      ...edge,
-      weight: Math.floor(Math.random() * (parseInt(maxWeight) - parseInt(minWeight) + 1)) + parseInt(minWeight),
-    }));
-    setEdges(newEdges);
-    const { weight } = calculateOptimalPath(nodes,edges,startNode, endNode);
-    setOptimalPathWeight(weight);
-  };
-
+  // App.js
+const generateRandomEdges = () => {
+  if (!validateWeights()) return;
+  
+  const newEdges = edges.map(edge => ({
+    ...edge,
+    weight: Math.floor(Math.random() * (parseInt(maxWeight) - parseInt(minWeight) + 1)) + parseInt(minWeight),
+  }));
+  
+  setEdges(newEdges);
+  
+  // Recalculate optimal path with new edges and current operation
+  const { weight } = calculateOptimalPath(
+    nodes,
+    newEdges,
+    startNode,
+    endNode,
+    teacherOperation
+  );
+  
+  setOptimalPathWeight(weight);
+};
+  
   /**
    * Undoes the last selected edge, reverting the path to its previous state.
    */
@@ -217,7 +256,20 @@ const Graph = () => {
     setMode('');
     loadLevel(0);
     setCurrentLevel(0);
+
+
   };
+
+  const displayRunningTotal = (additionalWeight) => {
+    setTotalWeight((prevWeight) =>
+      teacherOperation === 'multiplication'
+        ? prevWeight === 0
+          ? additionalWeight
+          : prevWeight * additionalWeight
+        : prevWeight + additionalWeight
+    );
+  };
+  
 
  
 
@@ -281,24 +333,35 @@ const Graph = () => {
           </Svg>
 
           {mode === 'teacher' && !gameOver && (
-            <View style={styles.teacherControls}>
-              <TextInput
-                style={styles.inputBox}
-                placeholder="Min Weight"
-                keyboardType="numeric"
-                value={minWeight}
-                onChangeText={text => setMinWeight(text)}
-              />
-              <TextInput
-                style={styles.inputBox}
-                placeholder="Max Weight"
-                keyboardType="numeric"
-                value={maxWeight}
-                onChangeText={text => setMaxWeight(text)}
-              />
-              <Button title="Generate New Weights" onPress={generateRandomEdges} />
-            </View>
-          )}
+  <View style={styles.teacherControls}>
+    <TextInput
+      style={styles.inputBox}
+      placeholder="Min Weight"
+      keyboardType="numeric"
+      value={minWeight}
+      onChangeText={(text) => setMinWeight(text)}
+    />
+    <TextInput
+      style={styles.inputBox}
+      placeholder="Max Weight"
+      keyboardType="numeric"
+      value={maxWeight}
+      onChangeText={(text) => setMaxWeight(text)}
+    />
+    <Button title="Generate New Weights" onPress={generateRandomEdges} />
+    <Button
+      title={`Switch to ${
+        teacherOperation === 'sum' ? 'Multiplication' : 'Sum'
+      }`}
+      onPress={() =>
+        setTeacherOperation((prev) =>
+          prev === 'sum' ? 'multiplication' : 'sum'
+        )
+      }
+    />
+  </View>
+)}
+
 
           <Text style={styles.gameMessage}>{message}</Text>
           {gameOver && (

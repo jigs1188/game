@@ -26,22 +26,24 @@ const auth = getAuth();
 
   const handleSignUp = async () => {
     try {
-      await sendOTP(email);
-      await auth().createUserWithEmailAndPassword(email, password);
-      const userDetails = {
-        name,
-        email,
-        ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
-      };
-      await firestore().collection(mode === 'student' ? 'students' : 'teachers').doc(email).set(userDetails);
+      // await sendOTP(email);
+      // await auth().createUserWithEmailAndPassword(email, password);
+      // const userDetails = {
+      //   name,
+      //   email,
+      //   ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
+      // };
+      // await firestore().collection(mode === 'student' ? 'students' : 'teachers').doc(email).set(userDetails);
       setIsNewUser(false);
       setMessage('OTP sent to your email.');
     } catch (error) {
+
       console.error(error);
       setMessage('Sign up failed. Please try again.');
     }
   };
 
+  // alan.satcard.iitplkd@gmail.com
 
   const handleOTPVerification = async () => {
     try {
@@ -62,7 +64,7 @@ const auth = getAuth();
 
   const handleLogin = async () => {
     try {
-      await auth().signInWithEmailAndPassword(email, password);
+      // await auth().signInWithEmailAndPassword(email, password);
       onAuthSuccess();
     } catch (error) {
       console.error(error);
