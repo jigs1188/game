@@ -1,11 +1,10 @@
-import { auth } from './firebaseConfig';
-import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail } from 'firebase/auth';
-import { sendEmailVerification  } from 'firebase/auth';
-import { doc, setDoc, getFirestore ,firestore } from 'firebase/firestore';
-import ReactNativeAsyncStorage from '@react-native-async-storage/async-storage';
-import { initializeAuth, getReactNativePersistence } from 'firebase/auth';
+// authFunctions.js
+import { auth, firestore } from './firebaseConfig';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification } from 'firebase/auth';
+import { doc, setDoc, getDoc, deleteDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 
-const db = getFirestore();
+
+// const db = getFirestore();
 
 export const signUpWithEmail = async (email, password) => {
   const userCredential = await createUserWithEmailAndPassword(auth, email, password);
@@ -23,37 +22,41 @@ export const signInWithEmail = async (email, password) => {
 
 export const sendOTP = async (email) => {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
   // Save OTP to Firestore with a timestamp
-  await firestore().collection('otps').doc(email).set({
+  await setDoc(doc(firestore, "otps", email), {
     otp,
-    timestamp: firestore.FieldValue.serverTimestamp(),
+    timestamp: serverTimestamp(),
   });
-  // Send OTP via email (implement via Firebase Cloud Functions)
+
+  // Send OTP via email (you need a Firebase Cloud Function for this)
   await sendPasswordResetEmail(auth, email);
 };
 
+
 export const verifyOTP = async (email, otp) => {
-  const otpDoc = await firestore().collection('otps').doc(email).get();
-  if (!otpDoc.exists) {
-    throw new Error('OTP not found');
+  const otpDoc = await getDoc(doc(firestore, "otps", email));
+
+  if (!otpDoc.exists()) {
+    throw new Error("OTP not found");
   }
 
   const { otp: storedOtp, timestamp } = otpDoc.data();
-  const currentTime = firestore.Timestamp.now();
+  const currentTime = Timestamp.now();
   const otpAge = currentTime.seconds - timestamp.seconds;
 
-  if (otpAge > 300) { // OTP is valid for 5 minutes (300 seconds)
-    throw new Error('OTP expired');
+  if (otpAge > 300) {
+    throw new Error("OTP expired");
   }
 
   if (storedOtp !== otp) {
-    throw new Error('Invalid OTP');
+    throw new Error("Invalid OTP");
   }
 
-  // If OTP is valid, delete it from Firestore
-  await firestore().collection('otps').doc(email).delete();
+  await deleteDoc(doc(firestore, "otps", email));
   return true;
 };
+
 
 
 export const resetPassword = async (email) => {

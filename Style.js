@@ -46,7 +46,7 @@ export const styles = StyleSheet.create({
   },
   homeButton: {
     position: 'absolute',
-    bottom: 20,
+    bottom: 50,
     left: 20,
     padding: 10,
     borderRadius: 5,
@@ -64,5 +64,6 @@ export const styles = StyleSheet.create({
   //   borderRadius: 5,
   //   margin: 5,
   },
+  
   
 });

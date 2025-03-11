@@ -38,7 +38,7 @@ const Graph = () => {
   const [mode, setMode] = useState(""); // '' | 'student' | 'teacher'
   const [cycleEdges, setCycleEdges] = useState([]); // Initialize as empty array
   const [hasNegativeCycle, setHasNegativeCycle] = useState(false);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(true);
   const [teacherOperation, setTeacherOperation] = useState("sum"); // 'sum' | 'multiplication'
   const [weightType, setWeightType] = useState("integer");
 
@@ -73,16 +73,6 @@ const Graph = () => {
       );
       return false;
     }
-    if (teacherOperation === "multiplication") {
-      if (min < 0 || max < 0) {
-        Alert.alert(
-          "Invalid Weights",
-          "Ensure both max weights are positive, and max is greater than min."
-        );
-        return false;
-      }
-    }
-
     return true;
   };
 
@@ -229,7 +219,7 @@ const Graph = () => {
         if (weightType === "real") {
           newWeight = parseFloat(newWeight.toFixed(3));
         } else if (weightType === "integer") {
-          newWeight = Math.round(Math.ceil(newWeight));
+          newWeight = Math.round(newWeight);
         }
         return { ...edge, weight: newWeight };
       }
@@ -322,17 +312,24 @@ const Graph = () => {
         // Game Screen
         <>
           <Svg height="400" width="400">
-            
+            <Defs>
+              <Marker
+                id="arrow"
+                viewBox="0 0 10 10"
+                refX="10"
+                refY="5"
+                markerWidth="8"
+                markerHeight="8"
+                orient="auto"
+              >
+                <Path d="M0,0 L10,5 L0,10 z" fill="black" />
+              </Marker>
+            </Defs>
             {edges.map((edge, index) => {
               const startNodeObj = nodes.find((n) => n.id === edge.from);
               const endNodeObj = nodes.find((n) => n.id === edge.to);
               const midX = (startNodeObj.x + endNodeObj.x) / 2;
               const midY = (startNodeObj.y + endNodeObj.y) / 2;
-
-              // Compute the angle for the arrow text in degrees.
-              const dx = endNodeObj.x - startNodeObj.x;
-              const dy = endNodeObj.y - startNodeObj.y;
-              const angle = (Math.atan2(dy, dx) * 180) / Math.PI;
 
               // Determine stroke color:
               // - Red if the edge is part of a negative cycle.
@@ -355,8 +352,8 @@ const Graph = () => {
                     y2={endNodeObj.y}
                     stroke={strokeColor}
                     strokeWidth={strokeColor === "green" ? "3" : "2"}
+                    markerEnd="url(#arrow)" // Arrow is always visible.
                   />
-                  {/* Display the edge weight above the line */}
                   <SvgText
                     x={midX}
                     y={midY - 10}
@@ -365,17 +362,6 @@ const Graph = () => {
                     fontWeight="bold"
                   >
                     {edge.weight}
-                  </SvgText>
-                  {/* Display the direction as an arrow ("→") rotated along the edge */}
-                  <SvgText
-                    x={midX}
-                    y={midY}
-                    fill="black"
-                    fontSize="12"
-                    fontWeight="bold"
-                    transform={`rotate(${angle}, ${midX}, ${midY})`}
-                  >
-                    →
                   </SvgText>
                 </React.Fragment>
               );
@@ -412,6 +398,7 @@ const Graph = () => {
               </SvgText>
             ))}
           </Svg>
+
           {mode === "teacher" && !gameOver && (
             <View style={styles.teacherControls}>
               <TextInput
@@ -461,10 +448,6 @@ const Graph = () => {
                   )
                 }
               />
-              <Button
-            title="Fix Negative Cycles"
-            onPress={handleNegativeCycleAdjustment}
-          />
             </View>
           )}
 
@@ -480,7 +463,10 @@ const Graph = () => {
           <Button title="Undo" onPress={undo} />
           <Button title="Check Path" onPress={checkPath} />
           <Button title="Reset Graph" onPress={resetGraph} />
-          
+          <Button
+            title="Fix Negative Cycles"
+            onPress={handleNegativeCycleAdjustment}
+          />
         </>
       )}
 

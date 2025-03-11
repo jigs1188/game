@@ -1,12 +1,10 @@
+// login.js
 import React, { useState } from 'react';
-import { View, Text, TextInput, Button, Pressable } from 'react-native';
-import auth from '@react-native-firebase/auth';
-import firestore from '@react-native-firebase/firestore';
-import { sendOTP, verifyOTP } from './authFunctions'; // Importing the auth functions
-import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
-
-
-  
+import { View, Text, TextInput, Button } from 'react-native';
+import { auth, firestore } from './firebaseConfig';
+import { createUserWithEmailAndPassword, signInWithEmailAndPassword } from "firebase/auth";
+import { doc, setDoc } from "firebase/firestore";
+import { sendOTP, verifyOTP } from './authFunctions';
 
 const Login = ({ mode, onAuthSuccess }) => {
   const [isNewUser, setIsNewUser] = useState(true);
@@ -20,51 +18,88 @@ const Login = ({ mode, onAuthSuccess }) => {
   const [teacherID, setTeacherID] = useState('');
   const [message, setMessage] = useState('');
 
-const auth = getAuth();
-  
+  // const handleSignUp = async () => {
+  //   try {
+  //     await sendOTP(email);
+  //     await createUserWithEmailAndPassword(auth, email, password);
+  //     const userDetails = {
+  //       name,
+  //       email,
+  //       ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
+  //     };
+  //     await setDoc(doc(firestore, mode === 'student' ? 'students' : 'teachers', email), userDetails);
+  //     setIsNewUser(false);
+  //     setMessage('OTP sent to your email.');
+  //   } catch (error) {
+  //     console.error(error);
+  //     setMessage('Sign up failed. Please try again.');
+  //   }
+  // };
 
+  // const handleOTPVerification = async () => {
+  //   try {
+  //     await verifyOTP(email, otp);
+  //     setIsOTPVerified(true);
+  //     const userDetails = {
+  //       name,
+  //       email,
+  //       ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
+  //     };
+  //     await setDoc(doc(firestore, mode === 'student' ? 'students' : 'teachers', email), userDetails);
+  //     onAuthSuccess();
+  //   } catch (error) {
+  //     console.error(error);
+  //     setMessage('OTP verification failed. Please try again.');
+  //   }
+  // };
 
-  const handleSignUp = async () => {
-    try {
-      // await sendOTP(email);
-      // await auth().createUserWithEmailAndPassword(email, password);
-      // const userDetails = {
-      //   name,
-      //   email,
-      //   ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
-      // };
-      // await firestore().collection(mode === 'student' ? 'students' : 'teachers').doc(email).set(userDetails);
-      setIsNewUser(false);
-      setMessage('OTP sent to your email.');
-    } catch (error) {
+  // login.js - Updated handleSignUp
+const handleSignUp = async () => {
+  try {
+    await sendOTP(email);
+    const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+    const uid = userCredential.user.uid; // Get UID
+    const userDetails = {
+      name,
+      email,
+      ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
+    };
+    // Use UID as document ID
+    await setDoc(doc(firestore, mode === 'student' ? 'students' : 'teachers', uid), userDetails);
+    setIsNewUser(false);
+    setMessage('OTP sent to your email.');
+  } catch (error) {
+    console.error(error);
+    setMessage('Sign up failed. Please try again.');
+  }
+};
 
-      console.error(error);
-      setMessage('Sign up failed. Please try again.');
-    }
-  };
-
-  // alan.satcard.iitplkd@gmail.com
-
-  const handleOTPVerification = async () => {
-    try {
-      await verifyOTP(email, otp);
-      setIsOTPVerified(true);
-      const userDetails = {
-        name,
-        email,
-        ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
-      };
-      await firestore().collection(mode === 'student' ? 'students' : 'teachers').doc(email).set(userDetails);
-      onAuthSuccess();
-    } catch (error) {
-      console.error(error);
-      setMessage('OTP verification failed. Please try again.');
-    }
-  };
+// Update handleOTPVerification to use UID if needed
+const handleOTPVerification = async () => {
+  try {
+    await verifyOTP(email, otp);
+    setIsOTPVerified(true);
+    // Ensure user is logged in and get UID
+    const user = auth.currentUser;
+    if (!user) throw new Error("User not logged in");
+    const uid = user.uid;
+    const userDetails = {
+      name,
+      email,
+      ...(mode === 'student' ? { rollNumber, className } : { teacherID }),
+    };
+    // Use UID here as well
+    await setDoc(doc(firestore, mode === 'student' ? 'students' : 'teachers', uid), userDetails);
+    onAuthSuccess();
+  } catch (error) {
+    console.error(error);
+    setMessage('OTP verification failed. Please try again.');
+  }
+};  
 
   const handleLogin = async () => {
     try {
-      // await auth().signInWithEmailAndPassword(email, password);
+      await signInWithEmailAndPassword(auth, email, password);
       onAuthSuccess();
     } catch (error) {
       console.error(error);
@@ -192,4 +227,4 @@ const styles = {
     borderWidth: 1,
     padding: 10,
   },
-}
+};
