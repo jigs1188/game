@@ -39,7 +39,7 @@ npm install -g expo-cli
 Use Git to clone the project repository:
 
 ```bash
-git clone https://github.com/jigs1188/ShortestPathGame.git
+git clone https://github.com/jigs1188/game
 cd shortest-path-game
 ```
 
